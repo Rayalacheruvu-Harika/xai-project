@@ -1,6 +1,13 @@
 # Virtual environment
 .venv/
 
+#DATA
+exp_alu_steel_1_ellip_dam/
+
+#results
+generated_test_masks/
+predictions/
+
 # Python cache
 __pycache__/
 *.pyc
