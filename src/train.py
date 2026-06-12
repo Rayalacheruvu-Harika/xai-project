@@ -6,7 +6,16 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from dataset import DamageDataset
-from model import get_model
+from model import CustomUNet
+
+import random
+import numpy as np
+
+SEED = 42
+
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
 
 
 # ------------------------
@@ -18,32 +27,24 @@ MASK_DIR = "exp_alu_steel_1_ellip_dam/train_masks"
 
 DEVICE = "cpu"
 
-EPOCHS = 50
-BATCH_SIZE = 1
+EPOCHS = 20
 LR = 1e-4
+BATCH_SIZE = 1
 
 Path("checkpoints").mkdir(exist_ok=True)
-
 
 # ------------------------
 # Read splits
 # ------------------------
 
 with open("splits/train.txt") as f:
-    train_files = [
-        line.strip()
-        for line in f.readlines()
-    ]
+    train_files = [line.strip() for line in f]
 
 with open("splits/val.txt") as f:
-    val_files = [
-        line.strip()
-        for line in f.readlines()
-    ]
-
+    val_files = [line.strip() for line in f]
 
 # ------------------------
-# Datasets
+# Dataset
 # ------------------------
 
 train_dataset = DamageDataset(
@@ -70,22 +71,21 @@ val_loader = DataLoader(
     shuffle=False
 )
 
-
 # ------------------------
 # Model
 # ------------------------
 
-model = get_model().to(DEVICE)
+model = CustomUNet(
+    in_channels=83,
+    out_channels=1
+).to(DEVICE)
 
 optimizer = torch.optim.Adam(
     model.parameters(),
     lr=LR
 )
 
-bce_loss = nn.BCEWithLogitsLoss(
-    pos_weight=torch.tensor([20.0])
-)
-
+bce_loss = nn.BCEWithLogitsLoss()
 
 # ------------------------
 # Dice Loss
@@ -97,13 +97,9 @@ def dice_loss(pred, target):
 
     smooth = 1e-6
 
-    intersection = (
-        pred * target
-    ).sum()
+    intersection = (pred * target).sum()
 
-    union = (
-        pred + target
-    ).sum()
+    union = (pred + target).sum()
 
     dice = (
         2 * intersection + smooth
@@ -112,7 +108,6 @@ def dice_loss(pred, target):
     )
 
     return 1 - dice
-
 
 # ------------------------
 # Validation
@@ -135,17 +130,15 @@ def validate():
 
             loss = (
                 bce_loss(pred, mask)
-                +
-                dice_loss(pred, mask)
+                + dice_loss(pred, mask)
             )
 
             total_loss += loss.item()
 
     return total_loss / len(val_loader)
 
-
 # ------------------------
-# Training Loop
+# Training
 # ------------------------
 
 best_val = float("inf")
@@ -167,8 +160,7 @@ for epoch in range(EPOCHS):
 
         loss = (
             bce_loss(pred, mask)
-            +
-            dice_loss(pred, mask)
+            + dice_loss(pred, mask)
         )
 
         loss.backward()

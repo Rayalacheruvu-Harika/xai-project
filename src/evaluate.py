@@ -9,6 +9,8 @@ gt_dir = Path("generated_test_masks")
 
 results = []
 
+THRESHOLD = 0.5
+
 for pred_file in pred_dir.glob("*_pred.png"):
 
     base_name = (
@@ -19,22 +21,56 @@ for pred_file in pred_dir.glob("*_pred.png"):
 
     gt_file = gt_dir / base_name
 
+    # --------------------------
+    # Load prediction
+    # --------------------------
+
     pred = Image.open(pred_file).convert("L")
-    pred = np.array(pred) > 0
+
+    pred = np.array(pred).astype(np.float32)
+
+    pred = pred / 255.0
+
+    pred = pred > THRESHOLD
+
+    # --------------------------
+    # Load ground truth
+    # --------------------------
 
     gt = Image.open(gt_file).convert("L")
-    gt = gt.resize((256, 256), Image.NEAREST)
+
+    gt = gt.resize(
+        (256, 256),
+        Image.NEAREST
+    )
+
     gt = np.array(gt) > 0
 
-    intersection = np.logical_and(pred, gt).sum()
-    union = np.logical_or(pred, gt).sum()
+    # --------------------------
+    # Metrics
+    # --------------------------
 
-    iou = intersection / (union + 1e-8)
+    intersection = np.logical_and(
+        pred,
+        gt
+    ).sum()
+
+    union = np.logical_or(
+        pred,
+        gt
+    ).sum()
+
+    iou = (
+        intersection /
+        (union + 1e-8)
+    )
 
     dice = (
         2 * intersection
     ) / (
-        pred.sum() + gt.sum() + 1e-8
+        pred.sum() +
+        gt.sum() +
+        1e-8
     )
 
     results.append([
@@ -42,6 +78,10 @@ for pred_file in pred_dir.glob("*_pred.png"):
         dice,
         iou
     ])
+
+# --------------------------
+# Results table
+# --------------------------
 
 df = pd.DataFrame(
     results,
@@ -54,11 +94,19 @@ df = pd.DataFrame(
 
 print(df)
 
-print("\nMean Dice:",
-      df["dice"].mean())
+print(
+    "\nMean Dice:",
+    df["dice"].mean()
+)
 
-print("Mean IoU:",
-      df["iou"].mean())
+print(
+    "Mean IoU:",
+    df["iou"].mean()
+)
+
+# --------------------------
+# Save results
+# --------------------------
 
 Path("results").mkdir(
     exist_ok=True

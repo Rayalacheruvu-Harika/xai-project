@@ -5,7 +5,8 @@ from pathlib import Path
 from PIL import Image
 
 from dataset import DamageDataset
-from model import get_model
+from model import CustomUNet
+
 
 DEVICE = "cpu"
 
@@ -15,7 +16,7 @@ PRED_DIR.mkdir(exist_ok=True)
 with open("splits/test.txt") as f:
     test_files = [
         line.strip()
-        for line in f.readlines()
+        for line in f
     ]
 
 dataset = DamageDataset(
@@ -24,7 +25,10 @@ dataset = DamageDataset(
     "exp_alu_steel_1_ellip_dam/train_masks"
 )
 
-model = get_model().to(DEVICE)
+model = CustomUNet(
+    in_channels=83,
+    out_channels=1
+).to(DEVICE)
 
 model.load_state_dict(
     torch.load(
@@ -46,8 +50,6 @@ with torch.no_grad():
         pred = model(signal)
 
         pred = torch.sigmoid(pred)
-
-        #pred = (pred > 0.5).float()
 
         pred = pred.squeeze().cpu().numpy()
 
