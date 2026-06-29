@@ -20,7 +20,7 @@ class DoubleConv(nn.Module):
         return self.conv(x)
 
 
-class CustomUNet(nn.Module):
+class Stage2UNet(nn.Module):
     def __init__(self, in_channels=83, out_channels=1):
         super().__init__()
 

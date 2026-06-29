@@ -1,63 +1,81 @@
-import torch
-import numpy as np
-
 from pathlib import Path
+
+import numpy as np
+import torch
 from PIL import Image
 
 from dataset import DamageDataset
 from model import CustomUNet
 
 
+# =========================================================
+# Config
+# =========================================================
+
 DEVICE = "cpu"
+
+DATA_DIR = "exp_alu_steel_1_ellip_dam/train_data"
+MASK_DIR = "exp_alu_steel_1_ellip_dam/train_masks"
+
+CHECKPOINT_PATH = "checkpoints/best_model.pth"
 
 PRED_DIR = Path("predictions")
 PRED_DIR.mkdir(exist_ok=True)
 
+
+# =========================================================
+# Load test file list
+# =========================================================
+
 with open("splits/test.txt") as f:
-    test_files = [
-        line.strip()
-        for line in f
-    ]
+    test_files = [line.strip() for line in f]
+
+
+# =========================================================
+# Dataset
+# =========================================================
 
 dataset = DamageDataset(
     test_files,
-    "exp_alu_steel_1_ellip_dam/train_data",
-    "exp_alu_steel_1_ellip_dam/train_masks"
+    DATA_DIR,
+    MASK_DIR
 )
 
-model = CustomUNet(
-    in_channels=83,
-    out_channels=1
-).to(DEVICE)
+
+# =========================================================
+# Model
+# =========================================================
+
+model = CustomUNet(in_channels=83, out_channels=1).to(DEVICE)
 
 model.load_state_dict(
-    torch.load(
-        "checkpoints/best_model.pth",
-        map_location=DEVICE
-    )
+    torch.load(CHECKPOINT_PATH, map_location=DEVICE)
 )
 
 model.eval()
 
+
+# =========================================================
+# Inference
+# Save probability maps, not thresholded masks
+# =========================================================
+
 with torch.no_grad():
-
     for idx, filename in enumerate(test_files):
-
         signal, _ = dataset[idx]
 
-        signal = signal.unsqueeze(0)
+        signal = signal.unsqueeze(0).to(DEVICE)   # [1, C, H, W]
 
-        pred = model(signal)
+        logits = model(signal)
+        probs = torch.sigmoid(logits)
 
-        pred = torch.sigmoid(pred)
+        probs = probs.squeeze().cpu().numpy()     # [H, W]
+        probs = np.clip(probs, 0.0, 1.0)
 
-        pred = pred.squeeze().cpu().numpy()
+        # Save as grayscale PNG in [0,255]
+        prob_uint8 = (probs * 255).astype(np.uint8)
 
-        pred = (pred * 255).astype(np.uint8)
-
-        Image.fromarray(pred).save(
-            PRED_DIR /
-            f"{Path(filename).stem}_pred.png"
-        )
+        out_name = f"{Path(filename).stem}_pred.png"
+        Image.fromarray(prob_uint8).save(PRED_DIR / out_name)
 
 print("Inference complete")

@@ -7,8 +7,8 @@ import torch.nn as nn
 
 from torch.utils.data import DataLoader
 
-from dataset import DamageDataset
-from model import CustomUNet
+from stage2_dataset import Stage2Dataset
+from model import Stage2UNet
 
 
 # =========================================================
@@ -30,16 +30,19 @@ MASK_DIR = "exp_alu_steel_1_ellip_dam/train_masks"
 
 DEVICE = "cpu"
 
-EPOCHS = 25
+EPOCHS = 50
 LR = 1e-4
 BATCH_SIZE = 1
 WEIGHT_DECAY = 1e-4
-POS_WEIGHT = 10.0
+POS_WEIGHT = 8.0
+
+CROP_SIZE = 128
+JITTER_PX = 12
 
 VAL_THRESHOLD = 0.5
 EARLY_STOPPING_PATIENCE = 12
 
-Path("checkpoints").mkdir(exist_ok=True)
+Path("checkpoints_stage2").mkdir(exist_ok=True)
 
 
 # =========================================================
@@ -52,16 +55,29 @@ with open("splits/train.txt") as f:
 with open("splits/val.txt") as f:
     val_files = [line.strip() for line in f]
 
-print(f"Train samples: {len(train_files)}")
-print(f"Val samples:   {len(val_files)}")
+print(f"Stage2 Train samples: {len(train_files)}")
+print(f"Stage2 Val samples:   {len(val_files)}")
 
 
 # =========================================================
 # Dataset / loaders
 # =========================================================
 
-train_dataset = DamageDataset(train_files, DATA_DIR, MASK_DIR)
-val_dataset = DamageDataset(val_files, DATA_DIR, MASK_DIR)
+train_dataset = Stage2Dataset(
+    train_files,
+    DATA_DIR,
+    MASK_DIR,
+    crop_size=CROP_SIZE,
+    jitter_px=JITTER_PX
+)
+
+val_dataset = Stage2Dataset(
+    val_files,
+    DATA_DIR,
+    MASK_DIR,
+    crop_size=CROP_SIZE,
+    jitter_px=0
+)
 
 train_loader = DataLoader(
     train_dataset,
@@ -82,7 +98,7 @@ val_loader = DataLoader(
 # Model
 # =========================================================
 
-model = CustomUNet(in_channels=83, out_channels=1).to(DEVICE)
+model = Stage2UNet(in_channels=83, out_channels=1).to(DEVICE)
 
 optimizer = torch.optim.Adam(
     model.parameters(),
@@ -95,7 +111,7 @@ bce_loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
 
 # =========================================================
-# Losses / metrics
+# Loss / metrics
 # =========================================================
 
 def dice_loss(logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
@@ -112,11 +128,7 @@ def dice_loss(logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
     return (1.0 - dice).mean()
 
 
-def dice_score_from_logits(
-    logits: torch.Tensor,
-    targets: torch.Tensor,
-    threshold: float = 0.5
-) -> float:
+def dice_score_from_logits(logits, targets, threshold=0.5):
     probs = torch.sigmoid(logits)
     preds = (probs > threshold).float()
 
@@ -151,11 +163,7 @@ def validate():
             logits = model(signal)
 
             loss = compute_loss(logits, mask)
-            dice = dice_score_from_logits(
-                logits,
-                mask,
-                threshold=VAL_THRESHOLD
-            )
+            dice = dice_score_from_logits(logits, mask, threshold=VAL_THRESHOLD)
 
             total_loss += loss.item()
             total_dice += dice
@@ -167,7 +175,7 @@ def validate():
 
 
 # =========================================================
-# Training
+# Training loop
 # =========================================================
 
 best_val_dice = -1.0
@@ -192,32 +200,29 @@ for epoch in range(EPOCHS):
         train_loss += loss.item()
 
     train_loss /= len(train_loader)
-
     val_loss, val_dice = validate()
 
     print(
-        f"Epoch {epoch + 1:02d} | "
+        f"Stage2 Epoch {epoch + 1:02d} | "
         f"TrainLoss {train_loss:.4f} | "
         f"ValLoss {val_loss:.4f} | "
         f"ValDice {val_dice:.4f}"
     )
 
-    # Save by best validation Dice, not loss
     if val_dice > best_val_dice:
         best_val_dice = val_dice
         epochs_without_improvement = 0
 
-        torch.save(model.state_dict(), "checkpoints/best_model.pth")
-        print("  -> Best model saved")
+        torch.save(model.state_dict(), "checkpoints_stage2/best_stage2_model.pth")
+        print("  -> Best Stage2 model saved")
     else:
         epochs_without_improvement += 1
 
     if epochs_without_improvement >= EARLY_STOPPING_PATIENCE:
         print(
-            f"Early stopping triggered after {epoch + 1} epochs. "
+            f"Early stopping Stage2 after {epoch + 1} epochs. "
             f"Best Val Dice: {best_val_dice:.4f}"
         )
         break
 
-
-print(f"\nTraining complete. Best validation Dice: {best_val_dice:.4f}")
+print(f"\nStage2 training complete. Best validation Dice: {best_val_dice:.4f}")

@@ -38,11 +38,9 @@ class DamageDataset(Dataset):
         ).astype(np.float32)
 
         # Normalize
-        signal = (
-            signal - signal.mean()
-        ) / (
-            signal.std() + 1e-8
-        )
+        signal_mean = signal.mean(axis=(1, 2), keepdims=True)
+        signal_std  = signal.std(axis=(1, 2), keepdims=True)
+        signal = (signal - signal_mean) / (signal_std + 1e-8)
 
         # ----------------------------
         # Load mask

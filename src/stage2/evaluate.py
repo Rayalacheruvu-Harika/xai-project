@@ -20,7 +20,7 @@ THRESHOLD = 0.5
 # Directories
 # ==================================================
 
-PRED_DIR = Path("predictions")
+PRED_DIR = Path("predictions2")
 GT_DIR = Path("generated_test_masks")
 
 results = []
