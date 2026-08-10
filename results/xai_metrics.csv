@@ -1,1 +1,7 @@
-file,gradcam_alignment,gradcam_peak_distance,ig_alignment,ig_peak_distance,shap_alignment,shap_peak_distance
+file,gradcam_alignment,gradcam_peak_distance,ig_alignment,ig_peak_distance
+train_damage_ellipse_xy_110_285_ab_58_12_th_180,0.023538077,152.72100916983678,0.15853412,115.4143681271294
+train_damage_ellipse_xy_175_320_ab_60_9_th_136,0.0,199.69529098228247,0.0,199.69529098228247
+train_damage_ellipse_xy_178_404_ab_84_13_th_83,0.042382333,198.50230669447868,0.17475168,23.317187484724148
+train_damage_ellipse_xy_255_418_ab_50_13_th_178,0.04164083,14.218814053998,0.15265805,27.496526519232066
+train_damage_ellipse_xy_266_309_ab_84_10_th_175,0.029352274,47.911201354705305,0.05470354,60.24677656622311
+train_damage_ellipse_xy_275_181_ab_75_14_th_46,0.054104973,77.39386375256096,0.18901478,146.77291185774195
